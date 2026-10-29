@@ -1,18 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { callClaude } from "./actions";
 
 export default function Home() {
   const [message, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
+    setMsg("");
     setLoading(true);
     try {
-      setMsg(await callClaude());
+      const res = await fetch("/api/claude", { method: "POST" });
+      if (!res.ok || !res.body) {
+        throw new Error(`Request failed: ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        // stream: true keeps multi-byte characters split across chunks intact
+        const chunk = decoder.decode(value, { stream: true });
+        setMsg((prev) => prev + chunk);
+      }
     } catch {
-      setMsg("Something went wrong calling Claude. Check the server logs.");
+      setMsg((prev) =>
+        prev + "\n\nSomething went wrong calling Claude. Check the server logs.",
+      );
     } finally {
       setLoading(false);
     }
